@@ -35,7 +35,22 @@ heath.center.update <- heath.center %>%
          `地级市` = if_else(`地级市` %in% c('省直辖县级行政区划', '自治区直辖县级行政区划'), 
                          `区[县/县级市]`, 
                          `地级市`), 
-         `地级市` = if_else(!is.na(City), City, `地级市`))
+         `地级市` = if_else(!is.na(City), City, `地级市`), 
+         `区[县/县级市]` = case_when(
+           `区[县/县级市]` == '湄潭县' ~ '湄潭区', 
+           `区[县/县级市]` == '南和县' ~ '南和区', 
+           `区[县/县级市]` == '南岔县' ~ '南岔区', 
+           `区[县/县级市]` == '监利县' ~ '监利市', 
+           `区[县/县级市]` == '邵东县' ~ '邵东市', 
+           `区[县/县级市]` == '海门市' ~ '海门区', 
+           `区[县/县级市]` == '龙南县' ~ '龙南市', 
+           `区[县/县级市]` == '同仁县' ~ '同仁市', 
+           `区[县/县级市]` == '蓬莱市' ~ '蓬莱区', 
+           `区[县/县级市]` == '太谷县' ~ '太谷区', 
+           `区[县/县级市]` == '新津县' ~ '新津区', 
+           `区[县/县级市]` == '和田市' ~ '和田县', 
+           TRUE ~ `区[县/县级市]`
+         ))
 
 ## eagle potential check
 eagle.potential.check <- eagle.potential %>% 
@@ -70,27 +85,38 @@ chk <- division.ratio %>%
 eagle.potential.division <- eagle.potential %>% 
   mutate(City = gsub('市', '', City)) %>% 
   group_by(Province, City, Prefecture) %>% 
-  summarise(CV1 = sum(CV1, na.rm = TRUE), 
+  summarise(`潜力合计` = sum(`潜力合计`, na.rm = TRUE), 
+            `内部销量合计` = sum(`内部销量合计`, na.rm = TRUE), 
+            `潜力新分组` = first(`潜力新分组`), 
+            `内部销量新分组` = first(`内部销量新分组`), 
+            `Segment-New` = first(`Segment-New`), 
+            `MS%` = sum(`MS%`, na.rm = TRUE), 
+            `份额分组` = first(`份额分组`), 
+            Decile = first(Decile), 
+            `潜力分组` = first(`潜力分组`), 
+            `份额高低` = first(`份额高低`), 
+            `区县分类` = first(`区县分类`), 
+            CV1 = sum(CV1, na.rm = TRUE), 
             DM1 = sum(DM1, na.rm = TRUE), 
             RE1 = sum(RE1, na.rm = TRUE)) %>% 
   ungroup() %>% 
   left_join(division.ratio, by = c('Province', 'City', 'Prefecture')) %>% 
-  mutate(CV1_center = CV1 * ratio, 
-         DM1_center = DM1 * ratio, 
-         RE1_center = RE1 * ratio) %>% 
-  select(-CV1, -DM1, -RE1, -patients, -ratio)
+  mutate(ratio = if_else(is.na(ratio), 1, ratio), 
+         CV1 = CV1 * ratio, 
+         DM1 = DM1 * ratio, 
+         RE1 = RE1 * ratio) %>% 
+  select(-patients, -ratio)
 
 write.xlsx(eagle.potential.division, '03_Outputs/Eagle_Potential_Division.xlsx')
 
 
 ##---- Check ----
 chk <- eagle.potential.division %>% 
-  filter(is.na(ratio)) %>% 
+  filter(is.na(CV1)) %>% 
   distinct(Province, City, Prefecture) %>% 
   arrange(Province, City, Prefecture) %>% 
   filter(!(City %in% c('北京', '上海')))
 
-write.xlsx(chk, 'Sub_Prefecture.xlsx')
 
 chk1 <- eagle.potential.division %>% 
   mutate(flag = if_else(is.na(ratio), 0, 1)) %>% 
