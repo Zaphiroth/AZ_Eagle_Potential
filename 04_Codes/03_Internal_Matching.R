@@ -16,9 +16,7 @@ internal <- read.xlsx('02_Inputs/BU THC机构销售数据.xlsx', sheet = '2019FY
               values_fill = 0)
 
 ## heath center
-name.mapping.raw <- read.xlsx('02_Inputs/Sim_Double_Check.xlsx', sheet = 2, cols = c(6, 12, 19:23))
-
-name.mapping <- name.mapping.raw %>% 
+name.mapping <- read.xlsx('02_Inputs/Sim_Double_Check.xlsx', sheet = 2, cols = c(6, 12, 19:23)) %>% 
   filter(flag0 == 1) %>% 
   filter(NAME %in% internal$`机构名称`) %>% 
   distinct(NAME, STANDARD_NAME) %>% 
