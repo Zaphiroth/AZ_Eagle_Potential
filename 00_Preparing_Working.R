@@ -26,6 +26,7 @@ suppressPackageStartupMessages({
   require(lubridate)
   require(forecast)
   require(qdapRegex)
+  require(doParallel)
 })
 
 ##---- setup the directories ----

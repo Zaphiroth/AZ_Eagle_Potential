@@ -72,6 +72,12 @@ division.ratio <- heath.center.update %>%
            `地址`, 
            `邮编`, 
            patients = `总诊疗人次数`) %>% 
+  group_by(Province, City, Prefecture, `机构名称`) %>% 
+  summarise(`TM编码` = first(`TM编码`), 
+            `地址` = first(`地址`), 
+            `邮编` = first(na.omit(`邮编`)), 
+            patients = sum(patients, na.rm = TRUE)) %>% 
+  ungroup() %>% 
   group_by(Province, City, Prefecture) %>% 
   mutate(ratio = patients / sum(patients)) %>% 
   ungroup()
@@ -108,23 +114,5 @@ eagle.potential.division <- eagle.potential %>%
   select(-patients, -ratio)
 
 write.xlsx(eagle.potential.division, '03_Outputs/Eagle_Potential_Division.xlsx')
-
-
-##---- Check ----
-chk <- eagle.potential.division %>% 
-  filter(is.na(CV1)) %>% 
-  distinct(Province, City, Prefecture) %>% 
-  arrange(Province, City, Prefecture) %>% 
-  filter(!(City %in% c('北京', '上海')))
-
-
-chk1 <- eagle.potential.division %>% 
-  mutate(flag = if_else(is.na(ratio), 0, 1)) %>% 
-  group_by(flag) %>% 
-  summarise(CV1 = sum(CV1, na.rm = TRUE), 
-            DM1 = sum(DM1, na.rm = TRUE), 
-            RE1 = sum(RE1, na.rm = TRUE)) %>% 
-  ungroup() %>% 
-  mutate()
 
 
