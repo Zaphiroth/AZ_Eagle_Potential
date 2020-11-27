@@ -9,6 +9,7 @@
 ##---- Readin AZ info ----
 ## BU THC
 bu.thc <- read.xlsx('02_Inputs/BU THC机构销售数据.xlsx', sheet = '2019FY') %>% 
+  filter(`2019FY销量` > 0) %>% 
   pivot_wider(id_cols = -c(`治疗领域`, `2019FY销量`), 
               names_from = `治疗领域`, 
               values_from = `2019FY销量`, 

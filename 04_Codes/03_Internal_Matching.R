@@ -145,8 +145,108 @@ bu.thc %>%
   colSums(na.rm = TRUE)
 
 
+##---- Manual matching 2nd ----
+## manual matching table
+internal.further2 <- read.xlsx('02_Inputs/BU THC机构销售数据.xlsx', sheet = '2019FY') %>% 
+  filter(`2019FY销量` > 0) %>% 
+  pivot_wider(id_cols = c(`省份`, `城市`, `CountyNameC`, `机构名称`), 
+              names_from = `治疗领域`, 
+              values_from = `2019FY销量`, 
+              values_fill = 0) %>% 
+  filter(!(`机构名称` %in% internal.further$`机构名称`)) %>% 
+  filter(!(`机构名称` %in% name.mapping$NAME))
+
+write.xlsx(internal.further2, '05_Internal_Review/Internal_Matching2.xlsx')
+
+## manual matching
+manual.mapping3 <- read.xlsx('05_Internal_Review/Internal_Matching2_part1.xlsx')
+manual.mapping4 <- read.xlsx('05_Internal_Review/Internal_Matching2_part2.xlsx')
+
+manual.mapping.m <- bind_rows(manual.mapping3, manual.mapping4) %>% 
+  filter(!is.na(STANDARD_NAME)) %>% 
+  group_by(STANDARD_NAME) %>% 
+  summarise(CV = sum(CV, na.rm = TRUE), 
+            DM = sum(DM, na.rm = TRUE), 
+            RE = sum(RE, na.rm = TRUE)) %>% 
+  ungroup()
+
+manual.matching2 <- manual.matching %>% 
+  filter(is.na(CV)) %>% 
+  select(-CV, -DM, -RE) %>% 
+  left_join(manual.mapping.m, by = 'STANDARD_NAME') %>% 
+  bind_rows(manual.matching[!is.na(manual.matching$CV), ])
+
+manual.matching2 %>% 
+  filter(!is.na(CV)) %>% 
+  summarise(CV = sum(CV), 
+            DM = sum(DM), 
+            RE = sum(RE))
 
 
+##---- Full mapping ----
+## internal sales
+internal <- read.xlsx('02_Inputs/BU THC机构销售数据.xlsx', sheet = '2019FY') %>% 
+  filter(`2019FY销量` > 0) %>% 
+  mutate(`城市` = gsub('市', '', `城市`)) %>% 
+  pivot_wider(id_cols = c(`省份`, `城市`, CountyNameC, `机构名称`), 
+              names_from = `治疗领域`, 
+              values_from = `2019FY销量`, 
+              values_fill = 0)
 
+## heath center
+name.mapping <- read.xlsx('02_Inputs/Sim_Double_Check.xlsx', sheet = 2, cols = c(6, 12, 19:23)) %>% 
+  filter(flag0 == 1) %>% 
+  filter(NAME %in% internal$`机构名称`) %>% 
+  distinct(NAME, STANDARD_NAME) %>% 
+  filter(!(NAME %in% c('高青县青城卫生院')))
 
+## IT
+part.it <- internal %>% 
+  inner_join(name.mapping, by = c('机构名称' = 'NAME')) %>% 
+  filter(STANDARD_NAME %in% eagle.potential.internal$STANDARD_NAME) %>% 
+  group_by(Province_I = `省份`, City_I = `城市`, Prefecture_I = CountyNameC, 
+           NAME = `机构名称`, STANDARD_NAME) %>% 
+  summarise(CV = sum(CV, na.rm = TRUE), 
+            DM = sum(DM, na.rm = TRUE), 
+            RE = sum(RE, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(flag = 'IT')
 
+## manual1
+part.manual1 <- bind_rows(manual.mapping1, manual.mapping2) %>% 
+  mutate(`城市` = gsub('市', '', `城市`), 
+         STANDARD_NAME = if_else(is.na(STANDARD_NAME), STANDARD_NAME1, STANDARD_NAME)) %>% 
+  filter(!is.na(STANDARD_NAME)) %>% 
+  distinct(`机构名称` = `机构名称.x`, .keep_all = TRUE) %>% 
+  group_by(Province_I = `省份`, City_I = `城市`, Prefecture_I = CountyNameC, 
+           NAME = `机构名称`, STANDARD_NAME) %>% 
+  summarise(CV = sum(CV, na.rm = TRUE), 
+            DM = sum(DM, na.rm = TRUE), 
+            RE = sum(RE, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(flag = 'Manual')
+
+## manual2
+part.manual2 <- bind_rows(manual.mapping3, manual.mapping4) %>% 
+  filter(!is.na(STANDARD_NAME)) %>% 
+  mutate(`城市` = gsub('市', '', `城市`)) %>% 
+  group_by(Province_I = `省份`, City_I = `城市`, Prefecture_I = CountyNameC, 
+           NAME = `机构名称`, STANDARD_NAME) %>% 
+  summarise(CV = sum(CV, na.rm = TRUE), 
+            DM = sum(DM, na.rm = TRUE), 
+            RE = sum(RE, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(flag = 'Manual')
+
+## surplus
+part.surplus <- internal %>% 
+  filter(!(`机构名称` %in% part.it$NAME), 
+         !(`机构名称` %in% part.manual1$NAME), 
+         !(`机构名称` %in% part.manual2$NAME)) %>% 
+  select(Province_I = `省份`, City_I = `城市`, Prefecture_I = CountyNameC, 
+         NAME = `机构名称`, CV, DM, RE) %>% 
+  mutate(flag = 'Unmatched')
+
+## write out
+write.xlsx(bind_rows(part.it, part.manual1, part.manual2, part.surplus), 
+           '03_Outputs/Internal_Standard.xlsx')

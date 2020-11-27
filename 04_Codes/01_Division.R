@@ -110,9 +110,29 @@ eagle.potential.division <- eagle.potential %>%
   mutate(ratio = if_else(is.na(ratio), 1, ratio), 
          CV1 = CV1 * ratio, 
          DM1 = DM1 * ratio, 
-         RE1 = RE1 * ratio) %>% 
-  select(-patients, -ratio)
+         RE1 = RE1 * ratio)
 
 write.xlsx(eagle.potential.division, '03_Outputs/Eagle_Potential_Division.xlsx')
 
+## potential
+eagle.potential.fmt <- eagle.potential %>% 
+  mutate(City = gsub('市', '', City)) %>% 
+  group_by(Province, City, Prefecture) %>% 
+  summarise(`潜力合计` = sum(`潜力合计`, na.rm = TRUE), 
+            `内部销量合计` = sum(`内部销量合计`, na.rm = TRUE), 
+            `潜力新分组` = first(`潜力新分组`), 
+            `内部销量新分组` = first(`内部销量新分组`), 
+            `Segment-New` = first(`Segment-New`), 
+            `MS%` = sum(`MS%`, na.rm = TRUE), 
+            `份额分组` = first(`份额分组`), 
+            Decile = first(Decile), 
+            `潜力分组` = first(`潜力分组`), 
+            `份额高低` = first(`份额高低`), 
+            `区县分类` = first(`区县分类`), 
+            CV1 = sum(CV1, na.rm = TRUE), 
+            DM1 = sum(DM1, na.rm = TRUE), 
+            RE1 = sum(RE1, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  left_join(division.ratio, by = c('Province', 'City', 'Prefecture'))
 
+write.xlsx(eagle.potential.fmt, '03_Outputs/Eagle_Potential_Format.xlsx')
