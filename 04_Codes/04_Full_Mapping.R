@@ -25,13 +25,26 @@ eagle.universe <- eagle.potential.fmt %>%
 eagle.pft <- eagle.universe %>% 
   filter(is.na(flag)) %>% 
   select(-NAME, -CV, -DM, -RE, -flag) %>% 
-  full_join(internal.std[internal.std$flag %in% c('Unmatched'), c(1:4, 6:9)], 
-            by = c('Province' = 'Province_I', 'City' = 'City_I', 'Prefecture' = 'Prefecture_I'))
+  full_join(internal.std[internal.std$flag %in% c('Unmatched'), ], 
+            by = c('Province' = 'Province_I', 'City' = 'City_I', 'Prefecture' = 'Prefecture_I', 'STANDARD_NAME')) %>% 
+  group_by(Province, City, Prefecture) %>% 
+  mutate(`潜力合计` = first(`潜力合计`), 
+         `内部销量合计` = first(`内部销量合计`), 
+         `潜力新分组` = first(`潜力新分组`), 
+         `内部销量新分组` = first(`内部销量新分组`), 
+         `Segment-New` = first(`Segment-New`), 
+         `MS%` = first(`MS%`), 
+         `份额分组` = first(`份额分组`), 
+         Decile = first(Decile), 
+         `潜力分组` = first(`潜力分组`), 
+         `份额高低` = first(`份额高低`), 
+         `区县分类` = first(`区县分类`), 
+         CV1 = first(CV1), 
+         DM1 = first(DM1), 
+         RE1 = first(RE1))
 
 ## potential check
-chk.ptt <- eagle.universe %>% 
-  filter(!is.na(flag)) %>% 
-  bind_rows(eagle.pft) %>% 
+chk.ptt <- eagle.full %>% 
   group_by(Province, City, Prefecture) %>% 
   summarise(CV1 = first(na.omit(CV1)), 
             DM1 = first(na.omit(DM1)), 
@@ -43,7 +56,7 @@ chk.ptt <- eagle.universe %>%
   mutate(cvflag = CV1 < CV, 
          dmflag = DM1 < DM, 
          reflag = RE1 < RE) %>% 
-  filter(isTRUE(cvflag) | isTRUE(dmflag) | isTRUE(reflag))
+  filter(cvflag == 1 | dmflag == 1 | reflag == 1)
 
 ## full
 eagle.full <- eagle.universe %>% 
@@ -53,16 +66,35 @@ eagle.full <- eagle.universe %>%
   mutate(CV1 = first(na.omit(CV1)), 
          DM1 = first(na.omit(DM1)), 
          RE1 = first(na.omit(RE1)), 
-         CV_margin = CV1 - sum(CV, na.rm = TRUE), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.25), patients)) %>% 
+  ungroup() %>% 
+  group_by(Province, City) %>% 
+  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.25), CV1), 
+         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.25), DM1), 
+         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.25), RE1), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.25), patients)) %>% 
+  ungroup() %>% 
+  group_by(Province) %>% 
+  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.25), CV1), 
+         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.25), DM1), 
+         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.25), RE1), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.25), patients)) %>% 
+  ungroup() %>% 
+  group_by(Province, City, Prefecture) %>% 
+  mutate(CV_margin = CV1 - sum(CV, na.rm = TRUE), 
          DM_margin = DM1 - sum(DM, na.rm = TRUE), 
          RE_margin = RE1 - sum(RE, na.rm = TRUE), 
-         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.75), patients), 
-         ratio = patients / sum(patients), 
-         ratio = if_else(is.na(ratio), 1/n(), ratio)) %>% 
+         ratio = patients / sum(patients)) %>% 
   ungroup() %>% 
-  mutate(CV1 = CV_margin * ratio + CV, 
-         DM1 = DM_margin * ratio + DM, 
-         RE1 = RE_margin * ratio + RE) %>% 
+  mutate(CV2 = CV_margin * ratio + if_else(is.na(CV), 0, CV), 
+         DM2 = DM_margin * ratio + if_else(is.na(DM), 0, DM), 
+         RE2 = RE_margin * ratio + if_else(is.na(RE), 0, RE)) %>% 
+  rename(CV_pft = CV1, 
+         DM_pft = DM1, 
+         RE_pft = RE1, 
+         CV_hc = CV2, 
+         DM_hc = DM2, 
+         RE_hc = RE2) %>% 
   select(-patients, -ratio, -STANDARD_NAME, -CV_margin, -DM_margin, -RE_margin)
 
 write.xlsx(eagle.full, '03_Outputs/Eagle_Potential_Internal.xlsx')
