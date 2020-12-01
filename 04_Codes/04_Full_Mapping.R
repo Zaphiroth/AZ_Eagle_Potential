@@ -39,9 +39,10 @@ eagle.pft <- eagle.universe %>%
          `潜力分组` = first(`潜力分组`), 
          `份额高低` = first(`份额高低`), 
          `区县分类` = first(`区县分类`), 
-         CV1 = first(CV1), 
-         DM1 = first(DM1), 
-         RE1 = first(RE1))
+         CV1 = first(CV1) + sum(CV[is.na(CV1)]), 
+         DM1 = first(DM1) + sum(DM[is.na(DM1)]), 
+         RE1 = first(RE1) + sum(RE[is.na(RE1)])) %>% 
+  ungroup()
 
 ## potential check
 chk.ptt <- eagle.full %>% 
@@ -56,29 +57,32 @@ chk.ptt <- eagle.full %>%
   mutate(cvflag = CV1 < CV, 
          dmflag = DM1 < DM, 
          reflag = RE1 < RE) %>% 
-  filter(cvflag == 1 | dmflag == 1 | reflag == 1)
+  filter(cvflag == 1 | dmflag == 1 | reflag == 1) %>% 
+  mutate(cvdiff = (CV - CV1) / CV1, 
+         dmdiff = (DM - DM1) / DM1, 
+         rediff = (RE - RE1) / RE1)
 
 ## full
 eagle.full <- eagle.universe %>% 
   filter(!is.na(flag)) %>% 
   bind_rows(eagle.pft) %>% 
   group_by(Province, City, Prefecture) %>% 
-  mutate(CV1 = first(na.omit(CV1)), 
-         DM1 = first(na.omit(DM1)), 
-         RE1 = first(na.omit(RE1)), 
-         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.25), patients)) %>% 
+  mutate(CV1 = last(na.omit(CV1)), 
+         DM1 = last(na.omit(DM1)), 
+         RE1 = last(na.omit(RE1)), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
   ungroup() %>% 
   group_by(Province, City) %>% 
-  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.25), CV1), 
-         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.25), DM1), 
-         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.25), RE1), 
-         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.25), patients)) %>% 
+  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.1), CV1), 
+         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.1), DM1), 
+         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.1), RE1), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
   ungroup() %>% 
   group_by(Province) %>% 
-  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.25), CV1), 
-         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.25), DM1), 
-         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.25), RE1), 
-         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.25), patients)) %>% 
+  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.1), CV1), 
+         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.1), DM1), 
+         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.1), RE1), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
   ungroup() %>% 
   group_by(Province, City, Prefecture) %>% 
   mutate(CV_margin = CV1 - sum(CV, na.rm = TRUE), 
