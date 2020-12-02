@@ -8,16 +8,16 @@
 
 ##---- Internal & potential data ----
 ## internal
-internal.std <- read.xlsx('03_Outputs/Internal_Standard_20201127.xlsx')
+internal.std <- read.xlsx('03_Outputs/Internal_Standard_20201202.xlsx')
 
 ## potential
-eagle.potential.fmt <- read_excel('03_Outputs/Eagle_Potential_Format.xlsx')
+eagle.potential.fmt <- read_excel('03_Outputs/Eagle_Potential_Format_20201202.xlsx')
 
 
 ##---- Full mapping ----
 ## universe
 eagle.universe <- eagle.potential.fmt %>% 
-  mutate(STANDARD_NAME = stri_paste(Prefecture, `机构名称`)) %>% 
+  # mutate(STANDARD_NAME = stri_paste(Prefecture, `机构名称`)) %>% 
   left_join(internal.std[internal.std$flag %in% c('IT', 'Manual'), ], by = 'STANDARD_NAME') %>% 
   select(-Province_I, -City_I, -Prefecture_I)
 
@@ -45,7 +45,33 @@ eagle.pft <- eagle.universe %>%
   ungroup()
 
 ## potential check
-chk.ptt <- eagle.full %>% 
+chk.ptt <- eagle.universe %>% 
+  filter(!is.na(flag)) %>% 
+  bind_rows(eagle.pft) %>% 
+  group_by(Province, City, Prefecture) %>% 
+  mutate(CV1 = last(na.omit(CV1)), 
+         DM1 = last(na.omit(DM1)), 
+         RE1 = last(na.omit(RE1)), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
+  ungroup() %>% 
+  group_by(Province, City) %>% 
+  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.1), CV1), 
+         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.1), DM1), 
+         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.1), RE1), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
+  ungroup() %>% 
+  group_by(Province) %>% 
+  mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.1), CV1), 
+         DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.1), DM1), 
+         RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.1), RE1), 
+         patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
+  ungroup() %>% 
+  group_by(Province, City, Prefecture) %>% 
+  mutate(CV_margin = CV1 - sum(CV, na.rm = TRUE), 
+         DM_margin = DM1 - sum(DM, na.rm = TRUE), 
+         RE_margin = RE1 - sum(RE, na.rm = TRUE), 
+         ratio = patients / sum(patients)) %>% 
+  ungroup() %>% 
   group_by(Province, City, Prefecture) %>% 
   summarise(CV1 = first(na.omit(CV1)), 
             DM1 = first(na.omit(DM1)), 
