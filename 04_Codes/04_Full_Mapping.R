@@ -8,10 +8,10 @@
 
 ##---- Internal & potential data ----
 ## internal
-internal.std <- read.xlsx('03_Outputs/Internal_Standard_20201202.xlsx')
+internal.std <- read.xlsx('03_Outputs/Internal_Standard_Updated.xlsx')
 
 ## potential
-eagle.potential.fmt <- read_excel('03_Outputs/Eagle_Potential_Format_20201202.xlsx')
+eagle.potential.fmt <- read_excel('03_Outputs/Eagle_Potential_Format.xlsx')
 
 
 ##---- Full mapping ----
@@ -20,6 +20,11 @@ eagle.universe <- eagle.potential.fmt %>%
   # mutate(STANDARD_NAME = stri_paste(Prefecture, `机构名称`)) %>% 
   left_join(internal.std[internal.std$flag %in% c('IT', 'Manual'), ], by = 'STANDARD_NAME') %>% 
   select(-Province_I, -City_I, -Prefecture_I)
+
+# chk <- internal.std %>% 
+#   filter(flag == 'Manual', !(STANDARD_NAME %in% eagle.universe$STANDARD_NAME))
+# 
+# write.xlsx(chk, 'Internal_Std_Update.xlsx')
 
 ## prefecture
 eagle.pft <- eagle.universe %>% 
@@ -67,10 +72,15 @@ chk.ptt <- eagle.universe %>%
          patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
   ungroup() %>% 
   group_by(Province, City, Prefecture) %>% 
-  mutate(CV_margin = CV1 - sum(CV, na.rm = TRUE), 
-         DM_margin = DM1 - sum(DM, na.rm = TRUE), 
-         RE_margin = RE1 - sum(RE, na.rm = TRUE), 
-         ratio = patients / sum(patients)) %>% 
+  mutate(CV1 = if_else(first(CV1) < sum(CV, na.rm = TRUE), 
+                       first(CV1) + (sum(CV, na.rm = TRUE) - first(CV1)) * 1.2, 
+                       first(CV1)), 
+         DM1 = if_else(first(DM1) < sum(DM, na.rm = TRUE), 
+                       first(DM1) + (sum(DM, na.rm = TRUE) - first(DM1)) * 1.2, 
+                       first(DM1)), 
+         RE1 = if_else(first(RE1) < sum(RE, na.rm = TRUE), 
+                       first(RE1) + (sum(RE, na.rm = TRUE) - first(RE1)) * 1.2, 
+                       first(RE1))) %>% 
   ungroup() %>% 
   group_by(Province, City, Prefecture) %>% 
   summarise(CV1 = first(na.omit(CV1)), 
@@ -92,24 +102,40 @@ chk.ptt <- eagle.universe %>%
 eagle.full <- eagle.universe %>% 
   filter(!is.na(flag)) %>% 
   bind_rows(eagle.pft) %>% 
+  ## 用补后的潜力替换补前的潜力
   group_by(Province, City, Prefecture) %>% 
   mutate(CV1 = last(na.omit(CV1)), 
          DM1 = last(na.omit(DM1)), 
          RE1 = last(na.omit(RE1)), 
          patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
   ungroup() %>% 
+  ## 市
   group_by(Province, City) %>% 
   mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.1), CV1), 
          DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.1), DM1), 
          RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.1), RE1), 
          patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
   ungroup() %>% 
+  ## 省
   group_by(Province) %>% 
   mutate(CV1 = if_else(is.na(CV1), quantile(na.omit(CV1), 0.1), CV1), 
          DM1 = if_else(is.na(DM1), quantile(na.omit(DM1), 0.1), DM1), 
          RE1 = if_else(is.na(RE1), quantile(na.omit(RE1), 0.1), RE1), 
          patients = if_else(is.na(patients), quantile(na.omit(patients), 0.1), patients)) %>% 
   ungroup() %>% 
+  ## 使潜力大于内部
+  group_by(Province, City, Prefecture) %>% 
+  mutate(CV1 = if_else(first(CV1) < sum(CV, na.rm = TRUE), 
+                       first(CV1) + (sum(CV, na.rm = TRUE) - first(CV1)) * 1.2, 
+                       first(CV1)), 
+         DM1 = if_else(first(DM1) < sum(DM, na.rm = TRUE), 
+                       first(DM1) + (sum(DM, na.rm = TRUE) - first(DM1)) * 1.2, 
+                       first(DM1)), 
+         RE1 = if_else(first(RE1) < sum(RE, na.rm = TRUE), 
+                       first(RE1) + (sum(RE, na.rm = TRUE) - first(RE1)) * 1.2, 
+                       first(RE1))) %>% 
+  ungroup() %>% 
+  ## 拆分
   group_by(Province, City, Prefecture) %>% 
   mutate(CV_margin = CV1 - sum(CV, na.rm = TRUE), 
          DM_margin = DM1 - sum(DM, na.rm = TRUE), 

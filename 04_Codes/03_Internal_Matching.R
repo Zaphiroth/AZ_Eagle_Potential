@@ -38,6 +38,8 @@ name.mapping <- read.xlsx('02_Inputs/Sim_Double_Check.xlsx', sheet = 2, cols = c
 
 
 ##---- Matching ----
+eagle.potential.fmt <- read.xlsx('03_Outputs/Eagle_Potential_Format.xlsx')
+
 eagle.potential.internal <- eagle.potential.fmt %>% 
   left_join(name.mapping, by = 'STANDARD_NAME')
 
@@ -117,10 +119,52 @@ part.surplus <- internal %>%
   mutate(flag = 'Unmatched')
 
 ## standard total
-internal.std <- bind_rows(part.it, part.manual1, part.manual2, part.surplus)
+internal.std1 <- bind_rows(part.it, part.manual1, part.manual2, part.surplus)
+
+## update standard name
+std.update <- read.xlsx('05_Internal_Review/Internal_Std_Update.xlsx') %>% 
+  distinct(Province_I, City_I, Prefecture_I, NAME, STANDARD_NAME_m = STANDARD_NAME)
+
+internal.std2 <- internal.std1 %>% 
+  left_join(std.update, by = c('Province_I', 'City_I', 'Prefecture_I', 'NAME')) %>% 
+  mutate(STANDARD_NAME = if_else(!is.na(STANDARD_NAME_m), STANDARD_NAME_m, STANDARD_NAME)) %>% 
+  select(-STANDARD_NAME_m)
+
+## update RE
+re.update.hc <- read.xlsx('05_Internal_Review/RE_Update_New_HC.xlsx', cols = c(2, 6))
+
+re.update <- read_xlsx('02_Inputs/【Data4】2019salesbyTAupdate 原始内部销量.xlsx', 
+                       sheet = 'CH739_20200929_195157') %>% 
+  filter(`机构类型...18` == '卫生院', `治疗领域` == 'RE') %>% 
+  mutate(`城市` = gsub('市', '', `城市`)) %>% 
+  group_by(Province_I = `省份`, NAME = `机构名称`) %>% 
+  summarise(`城市` = first(na.omit(`城市`)), 
+            InsCountyNameC = first(na.omit(InsCountyNameC)), 
+            RE_m = sum(`销售金额`, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  filter(RE_m > 0)
+
+internal.std3 <- internal.std2 %>% 
+  full_join(re.update, by = c('Province_I', 'NAME')) %>% 
+  mutate(RE_m = if_else(is.na(RE_m), 0, RE_m), 
+         RE = RE_m * 1.21 * 1.12, RE, 
+         CV = if_else(is.na(CV), 0, CV), 
+         DM = if_else(is.na(DM), 0, DM), 
+         City_I = if_else(is.na(City_I), `城市`, City_I), 
+         Prefecture_I = if_else(is.na(Prefecture_I), InsCountyNameC, Prefecture_I)) %>% 
+  left_join(re.update.hc, by = 'NAME') %>% 
+  mutate(STANDARD_NAME = if_else(is.na(STANDARD_NAME), STANDARD_NAME_m, STANDARD_NAME), 
+         flag = if_else(is.na(flag) & is.na(STANDARD_NAME), 'Unmatched', flag), 
+         flag = if_else(is.na(flag) & !is.na(STANDARD_NAME), 'Manual', flag)) %>% 
+  select(-`城市`, -InsCountyNameC, -RE_m, -STANDARD_NAME_m)
+
+# chk <- re.update %>% 
+#   filter(!(NAME %in% internal.std2$NAME))
+# 
+# write.xlsx(chk, 'RE_Update_New_HC.xlsx')
 
 ## write out
-write.xlsx(internal.std, '03_Outputs/Internal_Standard.xlsx')
+write.xlsx(internal.std3, '03_Outputs/Internal_Standard.xlsx')
 
 
 ##---- Matching further ----

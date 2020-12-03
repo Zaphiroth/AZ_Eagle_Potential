@@ -29,7 +29,7 @@ heath.center.district.check <- heath.center %>%
 sub.pft <- read.xlsx('02_Inputs/Sub_Prefecture.xlsx')
 
 heath.center.update <- heath.center %>% 
-  mutate(Province = gsub('省|市|自治区|回族', '', `省`)) %>% 
+  mutate(Province = gsub('省|市|自治区|壮族|回族|维吾尔', '', `省`)) %>% 
   left_join(sub.pft, by = c('Province', '区[县/县级市]' = 'Prefecture')) %>% 
   mutate(`省` = if_else(`地级市` == '西宁', '青海省', `省`), 
          `地级市` = if_else(`地级市` %in% c('省直辖县级行政区划', '自治区直辖县级行政区划'), 
@@ -65,22 +65,22 @@ eagle.potential.check <- eagle.potential %>%
 ## division ratio
 division.ratio <- heath.center.update %>% 
   distinct(`TM编码`, 
-           Province = gsub('省|市|自治区|回族', '', `省`), 
+           Province = gsub('省|市|自治区|壮族|回族|维吾尔', '', `省`), 
            City = gsub('市', '', `地级市`), 
            Prefecture = `区[县/县级市]`, 
            `机构名称`, 
            `地址`, 
            `邮编`, 
-           patients = `总诊疗人次数`, 
-           STANDARD_NAME) %>% 
-  group_by(Province, City, Prefecture, `机构名称`, STANDARD_NAME) %>% 
+           patients = `总诊疗人次数`) %>% 
+  group_by(Province, City, Prefecture, `机构名称`) %>% 
   summarise(`TM编码` = first(`TM编码`), 
             `地址` = first(`地址`), 
             `邮编` = first(na.omit(`邮编`)), 
             patients = sum(patients, na.rm = TRUE)) %>% 
   ungroup() %>% 
   group_by(Province, City, Prefecture) %>% 
-  mutate(ratio = patients / sum(patients)) %>% 
+  mutate(ratio = patients / sum(patients), 
+         STANDARD_NAME = stri_paste(Prefecture, `机构名称`)) %>% 
   ungroup()
 
 chk <- division.ratio %>% 
