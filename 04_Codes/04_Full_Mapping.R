@@ -8,7 +8,7 @@
 
 ##---- Internal & potential data ----
 ## internal
-internal.std <- read.xlsx('03_Outputs/Internal_Standard_Updated.xlsx')
+internal.std <- read.xlsx('03_Outputs/Internal_Standard.xlsx')
 
 ## potential
 eagle.potential.fmt <- read_excel('03_Outputs/Eagle_Potential_Format.xlsx')
@@ -154,5 +154,20 @@ eagle.full <- eagle.universe %>%
   select(-patients, -ratio, -STANDARD_NAME, -CV_margin, -DM_margin, -RE_margin)
 
 write.xlsx(eagle.full, '03_Outputs/Eagle_Potential_Internal.xlsx')
+
+## modification check
+heath.center.mod <- read.xlsx('02_Inputs/2019年中国卫生院数据库clean V2_区县检查.xlsx') %>% 
+  filter(!is.na(City_mod) | !is.na(Prefecture_mod)) %>% 
+  select(`TM编码`, City_mod, Prefecture_mod)
+
+eagle.full.mod <- eagle.full %>% 
+  left_join(heath.center.mod, by = 'TM编码')
+
+write.xlsx(eagle.full.mod, '03_Outputs/Eagle_Potential_Internal_Mod.xlsx')
+
+
+
+
+
 
 

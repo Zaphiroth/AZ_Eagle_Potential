@@ -164,7 +164,21 @@ internal.std3 <- internal.std2 %>%
 # write.xlsx(chk, 'RE_Update_New_HC.xlsx')
 
 ## write out
-write.xlsx(internal.std3, '03_Outputs/Internal_Standard.xlsx')
+internal.std <- internal.std3 %>% 
+  filter(!is.na(STANDARD_NAME)) %>% 
+  group_by(STANDARD_NAME) %>% 
+  summarise(Province_I = first(Province_I), 
+            City_I = first(City_I), 
+            Prefecture_I = first(Prefecture_I), 
+            NAME = first(NAME), 
+            CV = sum(CV, na.rm = TRUE), 
+            DM = sum(DM, na.rm = TRUE), 
+            RE = sum(RE, na.rm = TRUE), 
+            flag = first(flag)) %>% 
+  ungroup() %>% 
+  bind_rows(internal.std3[is.na(internal.std3$STANDARD_NAME), ])
+
+write.xlsx(internal.std, '03_Outputs/Internal_Standard.xlsx')
 
 
 ##---- Matching further ----
