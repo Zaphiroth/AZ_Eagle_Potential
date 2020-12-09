@@ -122,13 +122,12 @@ part.surplus <- internal %>%
 internal.std1 <- bind_rows(part.it, part.manual1, part.manual2, part.surplus)
 
 ## update standard name
-# std.update <- read.xlsx('05_Internal_Review/Internal_Std_Update.xlsx') %>% 
-#   distinct(Province_I, City_I, Prefecture_I, NAME, STANDARD_NAME_m = STANDARD_NAME)
-# 
-# internal.std2 <- internal.std1 %>% 
-#   left_join(std.update, by = c('Province_I', 'City_I', 'Prefecture_I', 'NAME')) %>% 
-#   mutate(STANDARD_NAME = if_else(!is.na(STANDARD_NAME_m), STANDARD_NAME_m, STANDARD_NAME)) %>% 
-#   select(-STANDARD_NAME_m)
+std.update <- read.xlsx('05_Internal_Review/Internal_Std_Update.xlsx', sheet = 2) %>% 
+  distinct(Province_I, City_I, Prefecture_I, NAME, STANDARD_NAME, CV, DM, RE, flag)
+
+internal.std2 <- internal.std1 %>% 
+  filter(!(NAME %in% std.update$NAME)) %>% 
+  bind_rows(std.update)
 
 ## update RE
 re.update.hc <- read.xlsx('05_Internal_Review/RE_Update_New_HC.xlsx', cols = c(2, 6))
@@ -144,7 +143,7 @@ re.update <- read_xlsx('02_Inputs/【Data4】2019salesbyTAupdate 原始内部销
   ungroup() %>% 
   filter(RE_m > 0)
 
-internal.std3 <- internal.std1 %>% 
+internal.std3 <- internal.std2 %>% 
   full_join(re.update, by = c('Province_I', 'NAME')) %>% 
   mutate(RE_m = if_else(is.na(RE_m), 0, RE_m), 
          RE = RE_m * 1.21 * 1.12, RE, 

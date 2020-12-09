@@ -54,21 +54,26 @@ eagle.universe.ratio <- eagle.universe %>%
   mutate(ratio = if_else(is.na(ratio), 1, ratio), 
          CV_hc = CV_margin * ratio + if_else(is.na(CV), 0, CV), 
          DM_hc = DM_margin * ratio + if_else(is.na(DM), 0, DM), 
-         RE_hc = RE_margin * ratio + if_else(is.na(RE), 0, RE)) %>% 
+         RE_hc = RE_margin * ratio + if_else(is.na(RE), 0, RE), 
+         flag = 1) %>% 
   select(-patients, -ratio, -CV_margin, -DM_margin, -RE_margin, -CV1, -DM1, -RE1)
 
 ## bind
 eagle.mod <- read.xlsx('02_Inputs/Eagle_Potential_Internal_Mod_20201204.xlsx')
 
 eagle.full.joint <- eagle.mod %>% 
+  mutate(`机构名称` = if_else(NAME == '和田县罕艾日克镇第二卫生院', NA_character_, `机构名称`), 
+         `TM编码` = if_else(NAME == '和田县罕艾日克镇第二卫生院', NA_character_, `TM编码`), 
+         `地址` = if_else(NAME == '和田县罕艾日克镇第二卫生院', NA_character_, `地址`), 
+         `邮编` = if_else(NAME == '和田县罕艾日克镇第二卫生院', NA_character_, `邮编`)) %>% 
   filter(!is.na(NAME), 
-         !(`TM编码` %in% eagle.universe.ratio$`TM编码`), 
          !(NAME %in% eagle.universe.ratio$NAME)) %>% 
+  mutate(flag = 0) %>% 
   bind_rows(eagle.universe.ratio) %>% 
   select(Province, City, Prefecture, `潜力合计`, `内部销量合计`, `潜力新分组`, `内部销量新分组`, 
          `Segment-New`, `MS%`, `份额分组`, Decile, `潜力分组`, `份额高低`, `区县分类`, 
          CV_ptt = CV_hc, DM_ptt = DM_hc, RE_ptt = RE_hc, `机构名称`, `TM编码`, `地址`, `邮编`, 
-         NAME, CV, DM, RE) %>% 
+         NAME, CV, DM, RE, flag) %>% 
   arrange(Province, City, Prefecture, `机构名称`)
 
 write.xlsx(eagle.full.joint, '03_Outputs/Eagle_Potential_Internal_Joint.xlsx')
